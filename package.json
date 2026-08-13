@@ -1,0 +1,100 @@
+{
+  "name": "pitchroom-karaoke",
+  "version": "0.1.0",
+  "description": "Local AI-powered personal karaoke studio",
+  "author": "PitchRoom",
+  "private": true,
+  "main": "electron/main.mjs",
+  "build": {
+    "appId": "com.pitchroom.karaoke",
+    "productName": "PITCHROOM",
+    "artifactName": "PITCHROOM-Setup-${version}-${arch}.${ext}",
+    "asar": true,
+    "compression": "maximum",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "electron/**/*",
+      "assets/**/*",
+      "dist-renderer/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "build/python-runtime",
+        "to": "python-runtime"
+      },
+      {
+        "from": "build/runtime",
+        "to": "runtime"
+      },
+      {
+        "from": "local_backend",
+        "to": "backend/local_backend",
+        "filter": ["**/*.py"]
+      }
+    ],
+    "win": {
+      "icon": "assets/pitchroom-icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "PITCHROOM",
+      "deleteAppDataOnUninstall": false
+    }
+  },
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "dev": "vite --config vite.electron.config.ts",
+    "build": "vite build --config vite.electron.config.ts",
+    "build:renderer": "vite build --config vite.electron.config.ts",
+    "prepare:runtime": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/prepare-runtime.ps1",
+    "package:dir": "pnpm run build:renderer && pnpm run prepare:runtime && electron-builder --win --x64 --dir",
+    "package:win": "pnpm run build:renderer && pnpm run prepare:runtime && electron-builder --win nsis --x64",
+    "start": "electron .",
+    "electron": "electron .",
+    "electron:dev": "electron . --dev",
+    "test": "pnpm run build && node --test tests/*.test.mjs",
+    "test:python": ".venv\\Scripts\\python.exe -m unittest discover -s tests -p test_*.py",
+    "lint": "eslint app renderer electron tests vite.electron.config.ts"
+  },
+  "dependencies": {
+    "@spotify/basic-pitch": "1.0.1",
+    "@tensorflow/tfjs": "3.21.0",
+    "essentia.js": "0.1.3",
+    "react": "19.2.6",
+    "react-dom": "19.2.6"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.4",
+    "@tailwindcss/postcss": "4.2.1",
+    "@types/node": "22.19.19",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "6.0.2",
+    "electron": "^43.3.0",
+    "electron-builder": "^26.0.12",
+    "eslint": "9.39.4",
+    "eslint-plugin-jsx-a11y": "6.10.2",
+    "eslint-plugin-react": "7.37.5",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "globals": "16.4.0",
+    "tailwindcss": "4.2.1",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.59.3",
+    "vite": "8.0.13"
+  },
+  "type": "module"
+}

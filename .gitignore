@@ -1,0 +1,84 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/.vinext/
+/out/
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files (can opt-in for committing if needed)
+.env*
+
+# vercel
+.vercel
+
+/dist/
+/dist-renderer/
+/release/
+/build/python-runtime/
+/build/runtime/
+/.wrangler/
+/outputs/
+/work/
+
+# PitchRoom local engine
+/.venv/
+/.pitchroom/
+/.pitchroom-test/
+/.pitchroom-package-test/
+/pitchroom-site.tar.gz
+__pycache__/
+*.pyc
+*.tsbuildinfo
+
+# Local media, downloaded models, and analysis databases
+*.mp3
+*.wav
+*.m4a
+*.flac
+*.ogg
+*.aac
+*.pt
+*.pth
+*.safetensors
+*.sqlite
+*.sqlite3
+/models/
+/.cache/
+
+# Legacy hosted-site scaffold (the public project is Electron-only)
+/.openai/
+/app/chatgpt-auth.ts
+/app/layout.tsx
+/build/sites-vite-plugin.ts
+/db/
+/drizzle/
+/drizzle.config.ts
+/examples/
+/worker/
+/next-env.d.ts
+/next.config.ts
+/package-lock.json
+/vite.config.ts

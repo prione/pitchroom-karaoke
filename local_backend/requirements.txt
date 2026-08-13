@@ -1,0 +1,15 @@
+fastapi==0.141.1
+uvicorn==0.52.1
+python-multipart==0.0.32
+librosa==1.0.0
+soundfile==0.14.0
+torch>=2.1
+torchaudio>=2.1
+demucs==4.1.0
+torchcrepe==0.0.24
+yt-dlp[default]==2026.7.4
+imageio-ffmpeg==0.6.0
+mutagen==1.47.0
+piano-transcription-inference==0.0.6
+muscriptor==0.3.0
+audioread==3.1.0
