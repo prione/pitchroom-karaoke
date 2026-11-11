@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import threading
@@ -14,17 +15,56 @@ from local_backend.lead_melody import decode_lead_melody
 
 Progress = Callable[[int, str], None]
 _model = None
+_model_key = None
 _model_lock = threading.Lock()
 
 
-def _load_model():
-    global _model
+def muscriptor_settings() -> dict:
+    """Resolve model and decoding options without loading model weights."""
+    import torch
+
+    device = os.environ.get("PITCHROOM_MUSCRIPTOR_DEVICE", "auto").strip().lower()
+    if device == "auto":
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+    weights = os.environ.get("PITCHROOM_MUSCRIPTOR_WEIGHTS", "").strip()
+    if not weights:
+        weights = "medium" if device.startswith("cuda") else "small"
+    dtype = os.environ.get("PITCHROOM_MUSCRIPTOR_DTYPE", "").strip() or None
+    quality = os.environ.get("PITCHROOM_MUSCRIPTOR_QUALITY", "balanced").strip().lower()
+    if quality not in {"balanced", "high"}:
+        quality = "balanced"
+    return {
+        "weights": weights,
+        "device": device,
+        "dtype": dtype,
+        "quality": quality,
+        # Prelude forcing preserves notes crossing 5-second chunks but is slower.
+        "prelude_forcing": quality == "high",
+        "batch_size": 1 if quality == "high" or not device.startswith("cuda") else 4,
+    }
+
+
+def _candidate_cache_path(output_dir: Path, settings: dict) -> Path:
+    fingerprint = hashlib.sha256(
+        json.dumps(settings, ensure_ascii=False, sort_keys=True).encode("utf-8")
+    ).hexdigest()[:12]
+    return output_dir / f"muscriptor-events-{fingerprint}.json"
+
+
+def _load_model(settings: dict | None = None):
+    global _model, _model_key
+    settings = settings or muscriptor_settings()
+    key = (settings["weights"], settings["device"], settings["dtype"])
     with _model_lock:
-        if _model is None:
+        if _model is None or _model_key != key:
             from muscriptor import TranscriptionModel
 
-            weights = os.environ.get("PITCHROOM_MUSCRIPTOR_WEIGHTS", "small")
-            _model = TranscriptionModel.load_model(weights, device="cpu", dtype="float32")
+            _model = TranscriptionModel.load_model(
+                weights_path=settings["weights"],
+                device=settings["device"],
+                dtype=settings["dtype"],
+            )
+            _model_key = key
     return _model
 
 
@@ -87,28 +127,26 @@ def transcribe_multi_instrument(
     recoverable condition. The analyzer can then use its existing local
     modules instead of failing the whole song load.
     """
-    candidate_path = output_dir / "muscriptor-events.json"
+    settings = muscriptor_settings()
+    candidate_path = _candidate_cache_path(output_dir, settings)
     candidates = _read_cached_candidates(candidate_path)
     status = "cache" if candidates is not None else "ready"
     if candidates is None:
         try:
             progress(69, "複数楽器の採譜モデルを読み込んでいます")
-            model = _load_model()
+            model = _load_model(settings)
             from muscriptor import NoteEndEvent, NoteStartEvent
             from muscriptor.events import ProgressEvent
 
             starts: dict[int, object] = {}
             candidates = []
-            # The final decoder is anchored to an acoustic predominant-melody
-            # contour and does not depend on stable instrument labels across
-            # chunk boundaries. Decode four chunks together on CPU: this is
-            # several times faster than sequential prelude forcing while the
-            # contour keeps the selected karaoke line unchanged.
+            # Balanced mode batches chunks for speed. High quality forces the
+            # previous chunk's note prelude for better boundary continuity.
             for event in model.transcribe(
                 audio_path,
                 instruments=None,
-                prelude_forcing=False,
-                batch_size=4,
+                prelude_forcing=settings["prelude_forcing"],
+                batch_size=settings["batch_size"],
             ):
                 if isinstance(event, ProgressEvent):
                     fraction = event.completed / max(1, event.total)
@@ -145,6 +183,8 @@ def transcribe_multi_instrument(
     melody, decoder = decode_lead_melody(candidates, duration, contour_notes=contour_notes)
     return melody, {
         "status": status,
-        "model": "muscriptor-small",
+        "model": str(settings["weights"]),
+        "device": settings["device"],
+        "quality": settings["quality"],
         "decoder": decoder,
     }

@@ -1,8 +1,12 @@
+import os
+import tempfile
 import unittest
+from pathlib import Path
+from unittest import mock
 
 import numpy as np
 
-from local_backend.analyzer import MelodyNote, _choose_continuous_candidates, _fill_detected_contour_gaps, _measure_source_activity, _notes_from_track, _remove_interleaved_lower_voice, _route_instrumental_modules, _select_high_resolution_melody, _should_use_multi_instrument, _simplify_vocal_notes, _vocal_hypothesis_quality
+from local_backend.analyzer import MelodyNote, _cache_key, _choose_continuous_candidates, _fill_detected_contour_gaps, _measure_source_activity, _notes_from_track, _remove_interleaved_lower_voice, _route_instrumental_modules, _select_high_resolution_melody, _should_use_multi_instrument, _simplify_vocal_notes, _vocal_hypothesis_quality
 from local_backend.lead_melody import decode_lead_melody
 
 
@@ -371,6 +375,34 @@ class MultiInstrumentLeadDecoderTest(unittest.TestCase):
 
         self.assertEqual([note["midi"] for note in melody], [76, 77, 79, 81])
         self.assertTrue(metadata["contour_anchored"])
+
+class ModelProfileCacheTest(unittest.TestCase):
+    def test_analyzer_cache_changes_when_model_or_routing_changes(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            audio_path = Path(temporary) / "test.wav"
+            audio_path.write_bytes(b"transcription-cache-fingerprint")
+            with mock.patch.dict(os.environ, {
+                "PITCHROOM_MUSCRIPTOR_DEVICE": "cpu",
+                "PITCHROOM_MUSCRIPTOR_WEIGHTS": "small",
+                "PITCHROOM_MUSCRIPTOR_QUALITY": "balanced",
+                "PITCHROOM_MUSCRIPTOR_ROUTING": "adaptive",
+            }):
+                baseline = _cache_key(audio_path)
+            with mock.patch.dict(os.environ, {
+                "PITCHROOM_MUSCRIPTOR_DEVICE": "cpu",
+                "PITCHROOM_MUSCRIPTOR_WEIGHTS": "medium",
+                "PITCHROOM_MUSCRIPTOR_QUALITY": "high",
+                "PITCHROOM_MUSCRIPTOR_ROUTING": "always",
+            }):
+                upgraded = _cache_key(audio_path)
+            self.assertNotEqual(baseline, upgraded)
+
+    def test_routing_override_is_only_used_for_instrumentals(self) -> None:
+        with mock.patch.dict(os.environ, {"PITCHROOM_MUSCRIPTOR_ROUTING": "always"}):
+            self.assertTrue(_should_use_multi_instrument("instrumental", 5.0))
+            self.assertFalse(_should_use_multi_instrument("vocal", 0.2))
+        with mock.patch.dict(os.environ, {"PITCHROOM_MUSCRIPTOR_ROUTING": "off"}):
+            self.assertFalse(_should_use_multi_instrument("instrumental", 0.2))
 
 
 if __name__ == "__main__":
