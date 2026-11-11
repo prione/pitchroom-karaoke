@@ -43,6 +43,13 @@ $env:PITCHROOM_MUSCRIPTOR_ROUTING = "always"
 - `PITCHROOM_MUSCRIPTOR_ROUTING`: `adaptive`（既定）は既存方式との自動切替、`always` はインスト曲全体でMuScriptorを優先、`off` はMuScriptorを使わない。
 - `PITCHROOM_MUSCRIPTOR_DTYPE`: 省略推奨（MuScriptor側の既定動作）。必要なら `float32` / `float16` / `bfloat16` を指定できます。
 
+Windowsで `torch.cuda.is_available()` が `False` の場合は、CPU版PyTorchが入っていないか確認してください。NVIDIA GPU用CUDA対応PyTorchの導入は、仮想環境内で次のように行えます（GPU・ドライバ環境に合った版を選んでください）。
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install --upgrade torch torchaudio --index-url https://download.pytorch.org/whl/cu128
+.\.venv\Scripts\python.exe -c "import torch; print(torch.cuda.is_available())"
+```
+
 設定を変更した場合はアプリを再起動してください。解析キャッシュはモデルと品質設定ごとに区別され、別設定の古いノーツが再利用されないようにしています。MuScriptorの重みは初回取得が必要です。GPU利用でも音源の種類によっては主旋律の推定が誤るため、精度保証はありません。
 
 ## セットアップ
