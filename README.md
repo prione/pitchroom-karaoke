@@ -23,7 +23,27 @@ PITCHROOMは、音源ファイルやYouTube動画から主旋律を解析し、�
 - Python 3.12
 - FFmpeg（開発実行時。配布パッケージには同梱可能）
 
-MuScriptorを使う高精度なインスト解析には、[MuScriptor small](https://huggingface.co/MuScriptor/muscriptor-small)の利用条件への同意とHugging Face認証が必要です。
+MuScriptorを使う高精度なインスト解析には、使用するモデル（[small](https://huggingface.co/MuScriptor/muscriptor-small) / [medium](https://huggingface.co/MuScriptor/muscriptor-medium) / [large](https://huggingface.co/MuScriptor/muscriptor-large)）の利用条件への同意とHugging Face認証が必要です。モデルの重みは非商用ライセンスです。
+
+### MuScriptorの精度設定
+
+通常はGPU（CUDA）があれば `medium`、なければCPUの `small` を自動選択します。インスト曲では従来の楽器構成による解析経路の切替を維持しています。速度より精度を優先するときは、PowerShellで起動前に以下を設定します。
+
+```powershell
+$env:PITCHROOM_MUSCRIPTOR_DEVICE = "cuda"
+$env:PITCHROOM_MUSCRIPTOR_WEIGHTS = "large"
+$env:PITCHROOM_MUSCRIPTOR_QUALITY = "high"
+$env:PITCHROOM_MUSCRIPTOR_ROUTING = "always"
+.\start-local.ps1
+```
+
+- `PITCHROOM_MUSCRIPTOR_DEVICE`: `auto`（既定）、`cuda`、`cpu`。CUDAの利用には対応したPyTorchが必要です。
+- `PITCHROOM_MUSCRIPTOR_WEIGHTS`: `small` / `medium` / `large`。未指定時はGPUで `medium`、CPUで `small`。
+- `PITCHROOM_MUSCRIPTOR_QUALITY`: `balanced`（既定）は複数チャンク並列処理で速度優先、`high` は境界をまたぐノーツを引き継ぐ採譜で精度優先。
+- `PITCHROOM_MUSCRIPTOR_ROUTING`: `adaptive`（既定）は既存方式との自動切替、`always` はインスト曲全体でMuScriptorを優先、`off` はMuScriptorを使わない。
+- `PITCHROOM_MUSCRIPTOR_DTYPE`: 省略推奨（MuScriptor側の既定動作）。必要なら `float32` / `float16` / `bfloat16` を指定できます。
+
+設定を変更した場合はアプリを再起動してください。解析キャッシュはモデルと品質設定ごとに区別され、別設定の古いノーツが再利用されないようにしています。MuScriptorの重みは初回取得が必要です。GPU利用でも音源の種類によっては主旋律の推定が誤るため、精度保証はありません。
 
 ## セットアップ
 
