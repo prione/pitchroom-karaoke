@@ -20,10 +20,10 @@ import torchcrepe
 from demucs.api import Separator
 from scipy.ndimage import binary_closing, binary_dilation, binary_opening, median_filter
 
-from local_backend.muscriptor_adapter import transcribe_multi_instrument
+from local_backend.muscriptor_adapter import muscriptor_settings, transcribe_multi_instrument
 
 Progress = Callable[[int, str], None]
-ANALYZER_VERSION = "9.0"
+ANALYZER_VERSION = "9.1"
 TARGET_SR = 22_050
 MODEL_NAME = "htdemucs_6s"
 _separator: Separator | None = None
@@ -659,8 +659,15 @@ def _energy(audio: np.ndarray) -> float:
 
 
 def _should_use_multi_instrument(mode: str, attack_to_continuous_ratio: float) -> bool:
-    """Route only non-attack-dominant instrumentals to the slower general AMT."""
-    return mode == "instrumental" and attack_to_continuous_ratio < 1.30
+    """Keep the existing adaptive path unless higher quality is requested."""
+    if mode != "instrumental":
+        return False
+    routing = os.environ.get("PITCHROOM_MUSCRIPTOR_ROUTING", "adaptive").strip().lower()
+    if routing == "always":
+        return True
+    if routing == "off":
+        return False
+    return attack_to_continuous_ratio < 1.30
 
 
 def _fill_short_gaps(values: np.ndarray, max_gap: int = 4) -> np.ndarray:
@@ -1083,6 +1090,11 @@ def _extract_instrumental_melody(audio: np.ndarray, sample_rate: int, progress: 
 def _cache_key(path: Path) -> str:
     digest = hashlib.sha256()
     digest.update(ANALYZER_VERSION.encode())
+    # Different models, decoding quality and routing must not reuse older notes.
+    digest.update(json.dumps({
+        "muscriptor": muscriptor_settings(),
+        "routing": os.environ.get("PITCHROOM_MUSCRIPTOR_ROUTING", "adaptive").strip().lower(),
+    }, sort_keys=True).encode("utf-8"))
     with path.open("rb") as handle:
         for block in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(block)
